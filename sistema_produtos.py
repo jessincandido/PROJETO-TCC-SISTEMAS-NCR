@@ -1,0 +1,247 @@
+import tkinter as tk
+from tkinter import messagebox
+import tkinter.font as tkfont
+import sqlite3
+import hashlib
+
+# ================= TEMA =================
+COR_FUNDO = "#F8FAFC"
+COR_CARD = "#FFFFFF"
+COR_TEXTO = "#0F172A"
+COR_SUBTEXTO = "#475569"
+COR_PRIMARIA = "#2563EB"
+COR_ALERTA = "#F59E0B"
+COR_SUCESSO = "#10B981"
+
+# ================= BANCO =================
+conn = sqlite3.connect("produtos.db")
+cursor = conn.cursor()
+
+# ================= JANELA =================
+janela = tk.Tk()
+janela.title("Sistema Comercial - Produtos")
+janela.geometry("900x650")
+janela.configure(bg=COR_FUNDO)
+
+# ================= FONTE =================
+fonte_padrao = tkfont.nametofont("TkDefaultFont")
+fonte_padrao.configure(family="Segoe UI", size=11)
+janela.option_add("*Font", fonte_padrao)
+
+# ================= VARIÁVEIS =================
+codigo_var = tk.StringVar()
+produto_var = tk.StringVar(value="—")
+preco_var = tk.StringVar(value="R$ 0,00")
+quantidade_var = tk.StringVar(value="Quantidade: —")
+
+produto_codigo_atual = None
+produto_nome_atual = None
+produto_preco_atual = None
+produto_qtd_atual = None
+
+# ================= HEADER =================
+header = tk.Frame(janela, bg=COR_CARD, height=80)
+header.pack(fill="x")
+
+tk.Label(header, text="SISTEMAS NCR",
+         bg=COR_CARD, fg=COR_TEXTO,
+         font=("Segoe UI", 20, "bold")).pack(side="left", padx=30)
+
+tk.Label(header, text="Consulta de Produtos",
+         bg=COR_CARD, fg=COR_SUBTEXTO).pack(side="left")
+
+# ================= BUSCA =================
+frame_busca = tk.Frame(janela, bg=COR_CARD)
+frame_busca.pack(padx=30, pady=20, fill="x")
+
+tk.Label(frame_busca, text="Buscar produto",
+         bg=COR_CARD, fg=COR_SUBTEXTO).pack(anchor="w")
+
+entry_busca = tk.Entry(frame_busca, textvariable=codigo_var,
+                       font=("Segoe UI", 18))
+entry_busca.pack(fill="x", ipady=8)
+entry_busca.focus()
+
+# ================= CARD PRODUTO =================
+card = tk.Frame(janela, bg=COR_CARD)
+card.pack(padx=50, pady=30, fill="x")
+
+tk.Label(card, textvariable=produto_var,
+         bg=COR_CARD, fg=COR_TEXTO,
+         font=("Segoe UI", 40, "bold")).pack(anchor="w", padx=20, pady=(15, 5))
+
+tk.Label(card, textvariable=preco_var,
+         bg=COR_CARD, fg=COR_PRIMARIA,
+         font=("Segoe UI", 40, "bold")).pack(anchor="w", padx=20)
+
+tk.Label(card, textvariable=quantidade_var,
+         bg=COR_CARD, fg=COR_SUBTEXTO).pack(anchor="w", padx=20, pady=(5, 15))
+
+# ================= CONSULTAR =================
+def consultar(event=None):
+    global produto_codigo_atual, produto_nome_atual, produto_preco_atual, produto_qtd_atual
+
+    termo = codigo_var.get().strip()
+    if not termo:
+        return
+
+    cursor.execute("""
+        SELECT codigo, nome, preco, quantidade
+        FROM produtos
+        WHERE codigo = ? OR nome LIKE ?
+        LIMIT 1
+    """, (termo, f"%{termo}%"))
+
+    r = cursor.fetchone()
+
+    if r:
+        produto_codigo_atual, produto_nome_atual, produto_preco_atual, produto_qtd_atual = r
+        produto_var.set(r[1])
+        preco_var.set(f"R$ {r[2]:.2f}".replace(".", ","))
+        quantidade_var.set(f"Quantidade disponível: {r[3]}")
+    else:
+        produto_codigo_atual = None
+        produto_var.set("Produto não encontrado")
+        preco_var.set("—")
+        quantidade_var.set("Quantidade: —")
+
+    codigo_var.set("")
+
+entry_busca.bind("<Return>", consultar)
+
+# ================= LOGIN ADMIN =================
+def login_admin(callback):
+    login = tk.Toplevel(janela)
+    login.title("Autenticação")
+    login.geometry("350x250")
+    login.configure(bg=COR_FUNDO)
+
+    card = tk.Frame(login, bg=COR_CARD)
+    card.pack(expand=True, padx=30, pady=30)
+
+    tk.Label(card, text="Login Administrativo",
+             bg=COR_CARD, font=("Segoe UI", 15, "bold")).pack(pady=10)
+
+    entry_user = tk.Entry(card)
+    entry_user.pack(fill="x", pady=5)
+
+    entry_senha = tk.Entry(card, show="*")
+    entry_senha.pack(fill="x", pady=5)
+
+    def validar():
+        senha_hash = hashlib.sha256(entry_senha.get().encode()).hexdigest()
+        cursor.execute(
+            "SELECT nivel FROM usuarios WHERE usuario=? AND senha=?",
+            (entry_user.get(), senha_hash)
+        )
+        r = cursor.fetchone()
+        if r and r[0] == "admin":
+            login.destroy()
+            callback()
+        else:
+            messagebox.showerror("Erro", "Acesso negado")
+
+    tk.Button(card, text="ENTRAR",
+              bg=COR_PRIMARIA, fg="white",
+              command=validar).pack(fill="x", pady=15)
+
+# ================= CADASTRAR =================
+def cadastrar_produto():
+    t = tk.Toplevel(janela)
+    t.title("Cadastrar Produto")
+    t.geometry("500x420")
+    t.configure(bg=COR_FUNDO)
+
+    card = tk.Frame(t, bg=COR_CARD)
+    card.pack(expand=True, padx=30, pady=30)
+
+    entries = {}
+
+    for campo in ["Código", "Nome", "Preço", "Quantidade"]:
+        tk.Label(card, text=campo, bg=COR_CARD).pack(anchor="w")
+        e = tk.Entry(card)
+        e.pack(fill="x", pady=5)
+        entries[campo] = e
+
+    def salvar():
+        try:
+            cursor.execute(
+                "INSERT INTO produtos VALUES (?, ?, ?, ?)",
+                (entries["Código"].get(),
+                 entries["Nome"].get(),
+                 float(entries["Preço"].get()),
+                 int(entries["Quantidade"].get()))
+            )
+            conn.commit()
+            messagebox.showinfo("Sucesso", "Produto cadastrado")
+            t.destroy()
+        except Exception as e:
+            messagebox.showerror("Erro", str(e))
+
+    tk.Button(card, text="SALVAR",
+              bg=COR_SUCESSO, fg="white",
+              command=salvar).pack(fill="x", pady=20)
+
+# ================= EDITAR =================
+def editar_produto():
+    if not produto_codigo_atual:
+        messagebox.showwarning("Atenção", "Pesquise um produto primeiro")
+        return
+
+    def abrir():
+        t = tk.Toplevel(janela)
+        t.title("Editar Produto")
+        t.geometry("500x420")
+        t.configure(bg=COR_FUNDO)
+
+        card = tk.Frame(t, bg=COR_CARD)
+        card.pack(expand=True, padx=30, pady=30)
+
+        nome = tk.Entry(card)
+        nome.pack(fill="x")
+        nome.insert(0, produto_nome_atual)
+
+        preco = tk.Entry(card)
+        preco.pack(fill="x", pady=5)
+        preco.insert(0, produto_preco_atual)
+
+        qtd = tk.Entry(card)
+        qtd.pack(fill="x", pady=5)
+        qtd.insert(0, produto_qtd_atual)
+
+        def salvar():
+            cursor.execute(
+                "UPDATE produtos SET nome=?, preco=?, quantidade=? WHERE codigo=?",
+                (nome.get(), float(preco.get()), int(qtd.get()), produto_codigo_atual)
+            )
+            conn.commit()
+            messagebox.showinfo("Sucesso", "Produto atualizado")
+            t.destroy()
+
+        tk.Button(card, text="SALVAR",
+                  bg=COR_ALERTA, fg="white",
+                  command=salvar).pack(fill="x", pady=20)
+
+    login_admin(abrir)
+
+# ================= BARRA INFERIOR =================
+barra = tk.Frame(janela, bg=COR_CARD)
+barra.pack(fill="x", side="bottom", pady=10)
+
+tk.Button(barra, text="Cadastrar Produto",
+          bg=COR_PRIMARIA, fg="white",
+          command=lambda: login_admin(cadastrar_produto)
+          ).pack(side="left", padx=20)
+
+tk.Button(barra, text="Editar Produto",
+          bg=COR_ALERTA, fg="white",
+          command=editar_produto
+          ).pack(side="left")
+
+# ================= FECHAR =================
+def fechar():
+    conn.close()
+    janela.destroy()
+
+janela.protocol("WM_DELETE_WINDOW", fechar)
+janela.mainloop()
