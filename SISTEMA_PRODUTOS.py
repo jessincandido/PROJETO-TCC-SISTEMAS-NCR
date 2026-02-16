@@ -5,8 +5,8 @@ import sqlite3
 import hashlib
 
 # ================= TEMA =================
-COR_FUNDO = "#F8FAFC"
-COR_CARD = "#FFFFFF"
+COR_FUNDO = "#D3D3D3"
+COR_CARD = "#ADD8E6"
 COR_TEXTO = "#0F172A"
 COR_SUBTEXTO = "#475569"
 COR_PRIMARIA = "#2563EB"
@@ -48,7 +48,7 @@ tk.Label(header, text="SISTEMAS NCR",
          font=("Segoe UI", 20, "bold")).pack(side="left", padx=30)
 
 tk.Label(header, text="Consulta de Produtos",
-         bg=COR_CARD, fg=COR_SUBTEXTO).pack(side="left")
+         bg=COR_CARD, fg="black").pack(side="left")
 
 # ================= BUSCA =================
 frame_busca = tk.Frame(janela, bg=COR_CARD)
@@ -57,10 +57,22 @@ frame_busca.pack(padx=30, pady=20, fill="x")
 tk.Label(frame_busca, text="Buscar produto",
          bg=COR_CARD, fg=COR_SUBTEXTO).pack(anchor="w")
 
-entry_busca = tk.Entry(frame_busca, textvariable=codigo_var,
-                       font=("Segoe UI", 18))
+# ================= VALIDAÇÃO BUSCA =================
+def validar_busca(texto):
+    return texto.isalnum() or texto == ""
+
+vcmd = (janela.register(validar_busca), "%P")
+
+entry_busca = tk.Entry(frame_busca,
+                       textvariable=codigo_var,
+                       font=("Segoe UI", 18),
+                       validate="key",
+                       validatecommand=vcmd)
+
 entry_busca.pack(fill="x", ipady=8)
 entry_busca.focus()
+
+
 
 # ================= CARD PRODUTO =================
 card = tk.Frame(janela, bg=COR_CARD)
@@ -145,6 +157,63 @@ def login_admin(callback):
               bg=COR_PRIMARIA, fg="white",
               command=validar).pack(fill="x", pady=15)
 
+# ================= CRIAR USUÁRIO =================
+def criar_usuario():
+    t = tk.Toplevel(janela)
+    t.title("Criar Usuário")
+    t.geometry("450x400")
+    t.configure(bg=COR_FUNDO)
+
+    card = tk.Frame(t, bg=COR_CARD)
+    card.pack(expand=True, padx=30, pady=30)
+
+    tk.Label(card, text="Cadastro de Usuário",
+             bg=COR_CARD, font=("Segoe UI", 15, "bold")).pack(pady=10)
+
+    tk.Label(card, text="Usuário", bg=COR_CARD).pack(anchor="w")
+    entry_user = tk.Entry(card)
+    entry_user.pack(fill="x", pady=5)
+
+    tk.Label(card, text="Senha", bg=COR_CARD).pack(anchor="w")
+    entry_senha = tk.Entry(card, show="*")
+    entry_senha.pack(fill="x", pady=5)
+
+    tk.Label(card, text="Nível (admin ou operador)", bg=COR_CARD).pack(anchor="w")
+    entry_nivel = tk.Entry(card)
+    entry_nivel.pack(fill="x", pady=5)
+
+    def salvar():
+        usuario = entry_user.get().strip()
+        senha = entry_senha.get().strip()
+        nivel = entry_nivel.get().strip().lower()
+
+        if not usuario or not senha or not nivel:
+            messagebox.showwarning("Atenção", "Preencha todos os campos")
+            return
+
+        if nivel not in ["admin", "operador"]:
+            messagebox.showwarning("Atenção", "Nível deve ser 'admin' ou 'operador'")
+            return
+
+        senha_hash = hashlib.sha256(senha.encode()).hexdigest()
+
+        try:
+            cursor.execute("""
+                INSERT INTO usuarios (usuario, senha, nivel)
+                VALUES (?, ?, ?)
+            """, (usuario, senha_hash, nivel))
+            conn.commit()
+
+            messagebox.showinfo("Sucesso", "Usuário criado com sucesso!")
+            t.destroy()
+
+        except sqlite3.IntegrityError:
+            messagebox.showerror("Erro", "Usuário já existe")
+
+    tk.Button(card, text="SALVAR",
+              bg=COR_SUCESSO, fg="white",
+              command=salvar).pack(fill="x", pady=20)
+
 # ================= CADASTRAR =================
 def cadastrar_produto():
     t = tk.Toplevel(janela)
@@ -225,18 +294,24 @@ def editar_produto():
     login_admin(abrir)
 
 # ================= BARRA INFERIOR =================
-barra = tk.Frame(janela, bg=COR_CARD)
+barra = tk.Frame(janela, bg="#D3D3D3")
 barra.pack(fill="x", side="bottom", pady=10)
 
 tk.Button(barra, text="Cadastrar Produto",
-          bg=COR_PRIMARIA, fg="white",
+          bg="#ADD8E6", fg="black",
           command=lambda: login_admin(cadastrar_produto)
           ).pack(side="left", padx=20)
 
 tk.Button(barra, text="Editar Produto",
-          bg=COR_ALERTA, fg="white",
+          bg="#FFDE21", fg="black",
           command=editar_produto
           ).pack(side="left")
+
+tk.Button(barra, text="Criar Usuário",
+          bg="#10B981", fg="black",
+          command=lambda: login_admin(criar_usuario)
+          ).pack(side="left", padx=20)
+
 
 # ================= FECHAR =================
 def fechar():
