@@ -10,6 +10,9 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import pagesizes
 from reportlab.lib.units import inch
 from tkinter import filedialog
+from PIL import Image as PILImage, ImageTk
+from reportlab.platypus import Image
+
 
 
 
@@ -38,7 +41,8 @@ fonte_padrao.configure(family="Segoe UI", size=11)
 janela.option_add("*Font", fonte_padrao)
 
 # ================= VARIÁVEIS =================
-codigo_var = tk.StringVar()
+codigo_entry_var = tk.StringVar()          # campo de digitação
+codigo_var = tk.StringVar(value="Código: —")  # aparece no card
 produto_var = tk.StringVar(value="—")
 preco_var = tk.StringVar(value="R$ 0,00")
 quantidade_var = tk.StringVar(value="Quantidade: —")
@@ -49,12 +53,18 @@ produto_preco_atual = None
 produto_qtd_atual = None
 
 # ================= HEADER =================
-header = tk.Frame(janela, bg=COR_CARD, height=80)
+header = tk.Frame(janela, bg=COR_CARD, height=110)
 header.pack(fill="x")
 
-tk.Label(header, text="SISTEMAS NCR",
-         bg=COR_CARD, fg=COR_TEXTO,
-         font=("Segoe UI", 20, "bold")).pack(side="left", padx=30)
+# ===== LOGO =====
+logo_img = PILImage.open("LOGONCR2.png")
+logo_img = logo_img.resize((450, 130))
+logo_tk = ImageTk.PhotoImage(logo_img)
+
+logo_label = tk.Label(header, image=logo_tk, bg=COR_CARD)
+logo_label.image = logo_tk
+logo_label.pack(side="left", padx=20, pady=10)
+
 
 tk.Label(header, text="Consulta de Produtos",
          bg=COR_CARD, fg="black").pack(side="left")
@@ -73,7 +83,7 @@ def validar_busca(texto):
 vcmd = (janela.register(validar_busca), "%P")
 
 entry_busca = tk.Entry(frame_busca,
-                       textvariable=codigo_var,
+                       textvariable=codigo_entry_var,
                        font=("Segoe UI", 18),
                        validate="key",
                        validatecommand=vcmd)
@@ -87,9 +97,13 @@ entry_busca.focus()
 card = tk.Frame(janela, bg=COR_CARD)
 card.pack(padx=50, pady=30, fill="x")
 
+tk.Label(card, textvariable=codigo_var,
+         bg=COR_CARD, fg=COR_SUBTEXTO,
+         font=("Segoe UI", 16)).pack(anchor="w", padx=20, pady=(15, 0))
+
 tk.Label(card, textvariable=produto_var,
          bg=COR_CARD, fg=COR_TEXTO,
-         font=("Segoe UI", 40, "bold")).pack(anchor="w", padx=20, pady=(15, 5))
+         font=("Segoe UI", 40, "bold")).pack(anchor="w", padx=20, pady=(5, 5))
 
 tk.Label(card, textvariable=preco_var,
          bg=COR_CARD, fg=COR_PRIMARIA,
@@ -98,11 +112,12 @@ tk.Label(card, textvariable=preco_var,
 tk.Label(card, textvariable=quantidade_var,
          bg=COR_CARD, fg=COR_SUBTEXTO).pack(anchor="w", padx=20, pady=(5, 15))
 
+
 # ================= CONSULTAR =================
 def consultar(event=None):
     global produto_codigo_atual, produto_nome_atual, produto_preco_atual, produto_qtd_atual
 
-    termo = codigo_var.get().strip()
+    termo = codigo_entry_var.get().strip()
     if not termo:
         return
 
@@ -120,13 +135,16 @@ def consultar(event=None):
         produto_var.set(r[1])
         preco_var.set(f"R$ {r[2]:.2f}".replace(".", ","))
         quantidade_var.set(f"Quantidade disponível: {r[3]}")
+        codigo_var.set(f"Código: {r[0]}")
     else:
         produto_codigo_atual = None
         produto_var.set("Produto não encontrado")
         preco_var.set("—")
         quantidade_var.set("Quantidade: —")
+        codigo_var.set("Código: —")
 
-    codigo_var.set("")
+    codigo_entry_var.set("")
+
 
 entry_busca.bind("<Return>", consultar)
 
@@ -398,7 +416,7 @@ def relatorio_diario():
     if not caminho:  # Se cancelar
         return
 
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
     from reportlab.lib import colors
     from reportlab.lib.styles import getSampleStyleSheet
     from reportlab.lib import pagesizes
@@ -408,6 +426,15 @@ def relatorio_diario():
 
     elements = []
     styles = getSampleStyleSheet()
+
+    # ===== LOGO NO TOPO =====
+    logo = Image("LOGONCR2.png")
+    logo.drawHeight = 60
+    logo.drawWidth = 150
+    logo.hAlign = 'CENTER'
+
+    elements.append(logo)
+    elements.append(Spacer(1, 0.2 * inch))
 
     elements.append(Paragraph("<b>RELATÓRIO DIÁRIO DE VENDAS</b>", styles["Title"]))
     elements.append(Spacer(1, 0.3 * inch))
