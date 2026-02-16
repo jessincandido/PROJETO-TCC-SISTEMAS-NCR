@@ -4,6 +4,13 @@ import tkinter.font as tkfont
 import sqlite3
 import hashlib
 from datetime import datetime
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib import pagesizes
+from reportlab.lib.units import inch
+from tkinter import filedialog
+
 
 
 # ================= TEMA =================
@@ -366,8 +373,6 @@ def editar_produto():
 
 # ================= RELATORIO =================
 def relatorio_diario():
-    from datetime import datetime
-
     data_hoje = datetime.now().strftime("%Y-%m-%d")
 
     cursor.execute("""
@@ -383,20 +388,61 @@ def relatorio_diario():
         messagebox.showinfo("Relatório", "Nenhuma venda hoje.")
         return
 
-    texto = f"RELATÓRIO DO DIA {data_hoje}\n\n"
+    # Abrir janela para escolher onde salvar
+    caminho = filedialog.asksaveasfilename(
+        defaultextension=".pdf",
+        initialfile=f"relatorio_{data_hoje}.pdf",
+        filetypes=[("Arquivo PDF", "*.pdf")]
+    )
 
+    if not caminho:  # Se cancelar
+        return
+
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib import pagesizes
+    from reportlab.lib.units import inch
+
+    doc = SimpleDocTemplate(caminho, pagesize=pagesizes.A4)
+
+    elements = []
+    styles = getSampleStyleSheet()
+
+    elements.append(Paragraph("<b>RELATÓRIO DIÁRIO DE VENDAS</b>", styles["Title"]))
+    elements.append(Spacer(1, 0.3 * inch))
+    elements.append(Paragraph(f"Data: {data_hoje}", styles["Normal"]))
+    elements.append(Spacer(1, 0.5 * inch))
+
+    dados = [["Produto", "Quantidade", "Total (R$)"]]
     total_geral = 0
 
     for nome, qtd_total, valor_total in resultados:
-        texto += f"{nome}\n"
-        texto += f"Quantidade vendida: {qtd_total}\n"
-        texto += f"Total: R$ {valor_total:.2f}\n\n"
+        dados.append([
+            nome,
+            str(qtd_total),
+            f"{valor_total:.2f}"
+        ])
         total_geral += valor_total
 
-    texto += f"TOTAL GERAL DO DIA: R$ {total_geral:.2f}"
+    tabela = Table(dados, colWidths=[3 * inch, 1.5 * inch, 1.5 * inch])
 
-    messagebox.showinfo("Relatório Diário", texto)
+    tabela.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+        ("GRID", (0, 0), (-1, -1), 1, colors.black),
+        ("ALIGN", (1, 1), (-1, -1), "CENTER"),
+    ]))
 
+    elements.append(tabela)
+    elements.append(Spacer(1, 0.5 * inch))
+
+    elements.append(
+        Paragraph(f"<b>TOTAL GERAL DO DIA: R$ {total_geral:.2f}</b>", styles["Heading2"])
+    )
+
+    doc.build(elements)
+
+    messagebox.showinfo("Sucesso", "Relatório PDF gerado com sucesso!")
 
 # ================= BARRA INFERIOR =================
 barra = tk.Frame(janela, bg="#D3D3D3")
