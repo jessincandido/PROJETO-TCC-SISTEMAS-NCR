@@ -394,10 +394,12 @@ def relatorio_diario():
     data_hoje = datetime.now().strftime("%Y-%m-%d")
 
     cursor.execute("""
-        SELECT nome_produto, SUM(quantidade), SUM(quantidade * preco)
+        SELECT codigo_produto, nome_produto, 
+               SUM(quantidade), 
+               SUM(quantidade * preco)
         FROM vendas
         WHERE data = ?
-        GROUP BY nome_produto
+        GROUP BY codigo_produto, nome_produto
     """, (data_hoje,))
 
     resultados = cursor.fetchall()
@@ -441,18 +443,19 @@ def relatorio_diario():
     elements.append(Paragraph(f"Data: {data_hoje}", styles["Normal"]))
     elements.append(Spacer(1, 0.5 * inch))
 
-    dados = [["Produto", "Quantidade", "Total (R$)"]]
+    dados = [["Código", "Produto", "Quantidade", "Total (R$)"]]
     total_geral = 0
 
-    for nome, qtd_total, valor_total in resultados:
+    for codigo, nome, qtd_total, valor_total in resultados:
         dados.append([
+            codigo,
             nome,
             str(qtd_total),
             f"{valor_total:.2f}"
         ])
         total_geral += valor_total
 
-    tabela = Table(dados, colWidths=[3 * inch, 1.5 * inch, 1.5 * inch])
+    tabela = Table(dados, colWidths=[1.2 * inch, 2.5 * inch, 1.2 * inch, 1.5 * inch])
 
     tabela.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
