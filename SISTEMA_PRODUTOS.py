@@ -3,6 +3,8 @@ from tkinter import messagebox
 import tkinter.font as tkfont
 import sqlite3
 import hashlib
+from datetime import datetime
+
 
 # ================= TEMA =================
 COR_FUNDO = "#D3D3D3"
@@ -120,6 +122,75 @@ def consultar(event=None):
     codigo_var.set("")
 
 entry_busca.bind("<Return>", consultar)
+
+# ================= VENDER PRODUTO =================
+def vender_produto():
+    global produto_codigo_atual, produto_qtd_atual
+
+    if not produto_codigo_atual:
+        messagebox.showwarning("Atenção", "Pesquise um produto primeiro")
+        return
+
+    janela_qtd = tk.Toplevel(janela)
+    janela_qtd.title("Quantidade")
+    janela_qtd.geometry("250x150")
+
+    tk.Label(janela_qtd, text="Quantidade para vender:").pack(pady=10)
+    entry_qtd = tk.Entry(janela_qtd)
+    entry_qtd.pack()
+
+    def confirmar():
+        global produto_qtd_atual
+
+        try:
+            qtd = int(entry_qtd.get())
+
+            if qtd <= 0:
+                raise ValueError
+
+            estoque_atual = int(produto_qtd_atual)
+
+            if qtd > estoque_atual:
+                messagebox.showerror("Erro", "Estoque insuficiente")
+                return
+
+            nova_qtd = estoque_atual - qtd
+
+            # Atualiza estoque
+            cursor.execute(
+                "UPDATE produtos SET quantidade=? WHERE codigo=?",
+                (nova_qtd, produto_codigo_atual)
+            )
+
+            # -------- REGISTRAR VENDA --------
+            data_hoje = datetime.now().strftime("%Y-%m-%d")
+
+            cursor.execute("""
+                INSERT INTO vendas (codigo_produto, nome_produto, quantidade, preco, data)
+                VALUES (?, ?, ?, ?, ?)
+            """, (
+                produto_codigo_atual,
+                produto_nome_atual,
+                qtd,
+                produto_preco_atual,
+                data_hoje
+            ))
+
+            conn.commit()
+            # ---------------------------------
+
+            produto_qtd_atual = nova_qtd
+            quantidade_var.set(f"Quantidade disponível: {nova_qtd}")
+
+            messagebox.showinfo("Sucesso", "Venda realizada!")
+            janela_qtd.destroy()
+
+        except ValueError:
+            messagebox.showerror("Erro", "Digite uma quantidade válida")
+
+    tk.Button(janela_qtd, text="Confirmar", command=confirmar).pack(pady=10)
+
+
 
 # ================= LOGIN ADMIN =================
 def login_admin(callback):
@@ -293,6 +364,40 @@ def editar_produto():
 
     login_admin(abrir)
 
+# ================= RELATORIO =================
+def relatorio_diario():
+    from datetime import datetime
+
+    data_hoje = datetime.now().strftime("%Y-%m-%d")
+
+    cursor.execute("""
+        SELECT nome_produto, SUM(quantidade), SUM(quantidade * preco)
+        FROM vendas
+        WHERE data = ?
+        GROUP BY nome_produto
+    """, (data_hoje,))
+
+    resultados = cursor.fetchall()
+
+    if not resultados:
+        messagebox.showinfo("Relatório", "Nenhuma venda hoje.")
+        return
+
+    texto = f"RELATÓRIO DO DIA {data_hoje}\n\n"
+
+    total_geral = 0
+
+    for nome, qtd_total, valor_total in resultados:
+        texto += f"{nome}\n"
+        texto += f"Quantidade vendida: {qtd_total}\n"
+        texto += f"Total: R$ {valor_total:.2f}\n\n"
+        total_geral += valor_total
+
+    texto += f"TOTAL GERAL DO DIA: R$ {total_geral:.2f}"
+
+    messagebox.showinfo("Relatório Diário", texto)
+
+
 # ================= BARRA INFERIOR =================
 barra = tk.Frame(janela, bg="#D3D3D3")
 barra.pack(fill="x", side="bottom", pady=10)
@@ -311,6 +416,16 @@ tk.Button(barra, text="Criar Usuário",
           bg="#10B981", fg="black",
           command=lambda: login_admin(criar_usuario)
           ).pack(side="left", padx=20)
+
+tk.Button(barra, text="Vender",
+          bg="#EF4444", fg="white",
+          command=vender_produto
+          ).pack(side="left", padx=10)
+
+tk.Button(barra, text="Relatório Diário",
+          bg="#2563EB", fg="white",
+          command=relatorio_diario
+          ).pack(side="left", padx=10)
 
 
 # ================= FECHAR =================
