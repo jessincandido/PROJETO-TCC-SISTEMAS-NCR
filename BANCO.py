@@ -25,6 +25,19 @@ CREATE TABLE IF NOT EXISTS usuarios (
 )
 """)
 
+# ================= TABELA VENDAS =================
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS vendas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    codigo_produto TEXT,
+    nome_produto TEXT,
+    quantidade INTEGER,
+    preco REAL,
+    data TEXT
+)
+""")
+conn.commit()
+
 # ================= HASH =================
 def hash_senha(senha):
     return hashlib.sha256(senha.encode()).hexdigest()
