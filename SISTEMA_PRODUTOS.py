@@ -3,6 +3,7 @@ from tkinter import messagebox
 import tkinter.font as tkfont
 import sqlite3
 import hashlib
+from tkinter import ttk
 from datetime import datetime
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib import colors
@@ -34,6 +35,7 @@ janela = tk.Tk()
 janela.title("Sistema Comercial - Produtos")
 janela.geometry("900x650")
 janela.configure(bg=COR_FUNDO)
+janela.withdraw()
 
 # ================= FONTE =================
 fonte_padrao = tkfont.nametofont("TkDefaultFont")
@@ -52,9 +54,22 @@ produto_nome_atual = None
 produto_preco_atual = None
 produto_qtd_atual = None
 
+# ================= USUÁRIO LOGADO =================
+usuario_logado = None
+usuario_label_var = tk.StringVar(value="Usuário: —")
+
+
 # ================= HEADER =================
 header = tk.Frame(janela, bg=COR_CARD, height=110)
 header.pack(fill="x")
+usuario_label = tk.Label(header,
+                         textvariable=usuario_label_var,
+                         bg=COR_CARD,
+                         fg=COR_TEXTO,
+                         font=("Segoe UI", 10, "bold"))
+
+usuario_label.pack(side="right", padx=20)
+usuario_nivel = None
 
 # ===== LOGO =====
 logo_img = PILImage.open("LOGONCR2.png")
@@ -243,7 +258,7 @@ def login_admin(callback):
             (entry_user.get(), senha_hash)
         )
         r = cursor.fetchone()
-        if r and r[0] == "admin":
+        if r and r[0].upper() == "ADMIN":
             login.destroy()
             callback()
         else:
@@ -274,21 +289,24 @@ def criar_usuario():
     entry_senha = tk.Entry(card, show="*")
     entry_senha.pack(fill="x", pady=5)
 
-    tk.Label(card, text="Nível (admin ou operador)", bg=COR_CARD).pack(anchor="w")
-    entry_nivel = tk.Entry(card)
-    entry_nivel.pack(fill="x", pady=5)
+    tk.Label(card, text="Nível", bg=COR_CARD).pack(anchor="w")
+
+    combo_nivel = ttk.Combobox(
+        card,
+        values=["admin", "operador"],
+        state="readonly"
+    )
+
+    combo_nivel.pack(fill="x", pady=5)
+    combo_nivel.current(0)
 
     def salvar():
         usuario = entry_user.get().strip()
         senha = entry_senha.get().strip()
-        nivel = entry_nivel.get().strip().lower()
+        nivel = combo_nivel.get().lower()
 
         if not usuario or not senha or not nivel:
             messagebox.showwarning("Atenção", "Preencha todos os campos")
-            return
-
-        if nivel not in ["admin", "operador"]:
-            messagebox.showwarning("Atenção", "Nível deve ser 'admin' ou 'operador'")
             return
 
         senha_hash = hashlib.sha256(senha.encode()).hexdigest()
@@ -508,6 +526,98 @@ tk.Button(barra, text="Relatório Diário",
 def fechar():
     conn.close()
     janela.destroy()
+# ================= TELA LOGIN =============
+def login_inicial():
+    login = tk.Toplevel()
+    login.title("Login do Sistema")
+    login.geometry("620x420")
+    login.configure(bg=COR_FUNDO)
+    login.grab_set()
+    login.resizable(False, False)
+
+    card = tk.Frame(login, bg=COR_CARD, bd=0)
+    card.place(relx=0.5, rely=0.5, anchor="center", width=350, height=360)
+
+    # ===== LOGO =====
+    try:
+        logo_img = PILImage.open("LOGONCR2.png")
+        logo_img = logo_img.resize((170, 90))
+        logo_tk = ImageTk.PhotoImage(logo_img)
+
+        logo_label = tk.Label(card, image=logo_tk, bg=COR_CARD)
+        logo_label.image = logo_tk
+        logo_label.pack(pady=(20, 10))
+    except:
+        pass
+
+    tk.Label(card,
+             text="Acesso ao Sistema",
+             bg=COR_CARD,
+             fg=COR_TEXTO,
+             font=("Segoe UI", 16, "bold")
+             ).pack(pady=(5, 15))
+
+    # ===== USUÁRIO =====
+    tk.Label(card, text="Usuário",
+             bg=COR_CARD,
+             fg=COR_SUBTEXTO).pack(anchor="w", padx=40)
+
+    entry_user = tk.Entry(card, font=("Segoe UI", 11))
+    entry_user.pack(fill="x", padx=40, pady=(0, 10), ipady=5)
+
+    # ===== SENHA =====
+    tk.Label(card, text="Senha",
+             bg=COR_CARD,
+             fg=COR_SUBTEXTO).pack(anchor="w", padx=40)
+
+    entry_senha = tk.Entry(card, show="*", font=("Segoe UI", 11))
+    entry_senha.pack(fill="x", padx=40, pady=(0, 20), ipady=5)
+
+    def validar():
+        usuario = entry_user.get().strip()
+        senha_digitada = entry_senha.get().strip()
+
+        if not usuario or not senha_digitada:
+            messagebox.showwarning("Atenção", "Preencha usuário e senha")
+            return
+
+        senha_hash = hashlib.sha256(senha_digitada.encode()).hexdigest()
+
+        cursor.execute(
+            "SELECT usuario, nivel FROM usuarios WHERE usuario=? AND senha=?",
+            (usuario, senha_hash)
+        )
+
+        resultado = cursor.fetchone()
+
+        if resultado:
+            global usuario_logado, usuario_nivel
+
+            usuario_logado = resultado[0]
+            usuario_nivel = resultado[1]
+
+            usuario_label_var.set(f"👤 {usuario_logado} ({usuario_nivel})")
+
+            login.destroy()
+            janela.deiconify()
+        else:
+            messagebox.showerror("Erro", "Usuário ou senha inválidos")
+
+    botao = tk.Button(card,
+                      text="ENTRAR",
+                      bg=COR_PRIMARIA,
+                      fg="white",
+                      activebackground="#1E40AF",
+                      relief="flat",
+                      font=("Segoe UI", 11, "bold"),
+                      command=validar)
+
+    botao.pack(fill="x", padx=40, ipady=8)
+
+    entry_senha.bind("<Return>", lambda event: validar())
+    entry_user.focus()
+
 
 janela.protocol("WM_DELETE_WINDOW", fechar)
+janela.after(200, login_inicial)
 janela.mainloop()
