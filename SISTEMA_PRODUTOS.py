@@ -13,8 +13,13 @@ from reportlab.lib.units import inch
 from tkinter import filedialog
 from PIL import Image as PILImage, ImageTk
 from reportlab.platypus import Image
+import sys
+import os
 
-
+def caminho_recurso(nome):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, nome)
+    return os.path.join(os.path.abspath("."), nome)
 
 
 # ================= TEMA =================
@@ -27,7 +32,24 @@ COR_ALERTA = "#F59E0B"
 COR_SUCESSO = "#10B981"
 
 # ================= BANCO =================
-conn = sqlite3.connect("produtos.db")
+import shutil
+
+pasta_sistema = r"C:\SistemaNCR"
+
+if not os.path.exists(pasta_sistema):
+    os.makedirs(pasta_sistema)
+
+caminho_banco_destino = os.path.join(pasta_sistema, "produtos.db")
+
+
+caminho_banco_origem = caminho_recurso("produtos.db")
+
+
+if not os.path.exists(caminho_banco_destino):
+    shutil.copy(caminho_banco_origem, caminho_banco_destino)
+
+
+conn = sqlite3.connect(caminho_banco_destino)
 cursor = conn.cursor()
 
 # ================= JANELA =================
@@ -36,6 +58,7 @@ janela.title("Sistema Comercial - Produtos")
 janela.geometry("900x650")
 janela.configure(bg=COR_FUNDO)
 janela.withdraw()
+janela.iconbitmap(caminho_recurso("icone_ncr.ico"))
 
 # ================= FONTE =================
 fonte_padrao = tkfont.nametofont("TkDefaultFont")
@@ -72,7 +95,7 @@ usuario_label.pack(side="right", padx=20)
 usuario_nivel = None
 
 # ===== LOGO =====
-logo_img = PILImage.open("LOGONCR2.png")
+logo_img = PILImage.open(caminho_recurso("LOGONCR2.png"))
 logo_img = logo_img.resize((450, 130))
 logo_tk = ImageTk.PhotoImage(logo_img)
 
@@ -151,6 +174,12 @@ def consultar(event=None):
         preco_var.set(f"R$ {r[2]:.2f}".replace(".", ","))
         quantidade_var.set(f"Quantidade disponível: {r[3]}")
         codigo_var.set(f"Código: {r[0]}")
+
+        def destacar():
+            card.config(bg="#C7E0FF")
+            janela.after(150, lambda: card.config(bg=COR_CARD))
+
+        destacar()
     else:
         produto_codigo_atual = None
         produto_var.set("Produto não encontrado")
@@ -274,6 +303,14 @@ def criar_usuario():
     t.title("Criar Usuário")
     t.geometry("450x400")
     t.configure(bg=COR_FUNDO)
+    t.attributes("-alpha", 0.0)
+
+    def fade_in(opacity=0.0):
+        if opacity <= 1.0:
+            t.attributes("-alpha", opacity)
+            t.after(15, fade_in, opacity + 0.05)
+
+    fade_in()
 
     card = tk.Frame(t, bg=COR_CARD)
     card.pack(expand=True, padx=30, pady=30)
@@ -448,7 +485,7 @@ def relatorio_diario():
     styles = getSampleStyleSheet()
 
     # ===== LOGO NO TOPO =====
-    logo = Image("LOGONCR2.png")
+    logo = Image(caminho_recurso("LOGONCR2.png"))
     logo.drawHeight = 60
     logo.drawWidth = 150
     logo.hAlign = 'CENTER'
@@ -524,14 +561,21 @@ tk.Button(barra, text="Relatório Diário",
 
 # ================= FECHAR =================
 def fechar():
-    conn.close()
+    try:
+        conn.close()
+    except:
+        pass
+
+    janela.quit()
     janela.destroy()
+    os._exit(0)
 # ================= TELA LOGIN =============
 def login_inicial():
     login = tk.Toplevel()
     login.title("Login do Sistema")
     login.geometry("620x420")
     login.configure(bg=COR_FUNDO)
+    login.iconbitmap(caminho_recurso("icone_ncr.ico"))
     login.grab_set()
     login.resizable(False, False)
 
@@ -540,7 +584,7 @@ def login_inicial():
 
     # ===== LOGO =====
     try:
-        logo_img = PILImage.open("LOGONCR2.png")
+        logo_img = PILImage.open(caminho_recurso("LOGONCR2.png"))
         logo_img = logo_img.resize((170, 90))
         logo_tk = ImageTk.PhotoImage(logo_img)
 
@@ -599,7 +643,19 @@ def login_inicial():
             usuario_label_var.set(f"👤 {usuario_logado} ({usuario_nivel})")
 
             login.destroy()
+
+            janela.attributes("-alpha", 0.0)
             janela.deiconify()
+
+            def fade_main(opacity=0):
+                opacity += 0.05
+                if opacity >= 1:
+                    janela.attributes("-alpha", 1.0)
+                    return
+                janela.attributes("-alpha", opacity)
+                janela.after(20, fade_main, opacity)
+
+            fade_main()
         else:
             messagebox.showerror("Erro", "Usuário ou senha inválidos")
 
